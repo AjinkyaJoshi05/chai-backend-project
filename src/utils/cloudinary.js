@@ -1,11 +1,12 @@
-import {v2 as cloudinary} from cloudinary;
+import cloudinaryModule from "cloudinary";
+const cloudinary = cloudinaryModule.v2;
 import fs from "fs";
 
 // Configuration
 cloudinary.config({ 
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME, 
     api_key: process.env.CLOUDINARY_API_KEY, 
-    api_secret: CLOUDINARY_API_SECRET // Click 'View API Keys' above to copy your API secret
+    api_secret: process.env.CLOUDINARY_API_SECRET // Click 'View API Keys' above to copy your API secret
 });
 
 
@@ -19,9 +20,17 @@ const uploadOnCloudinary = async (localFilePath) =>{
             resource_type:"auto"
         })
         console.log("file is uploaded on cloudinary ", response.url);
+        fs.unlinkSync(localFilePath);
         return response;
     } catch (error) {
-        fs.unlinkSync(localFilePath) // remove the locally saved temporary file if upload failed
+        console.error("Cloudinary upload failed:", error.message);
+        try{
+            fs.unlinkSync(localFilePath) // remove the locally saved temporary file if upload failed
+        }
+        catch (unlinkErr){
+            console.error(" Failed to delete temp file:", unlinkErr.message);
+        }
+        
         return null;
     }
 }

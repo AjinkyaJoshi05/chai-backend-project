@@ -3,6 +3,7 @@ import {ApiError} from "../utils/ApipError.js";
 import {User} from "../models/user.model.js";
 import {uploadOnCloudinary} from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import path from "path";
 
 const registerUser = asyncHandler( async (req, res)=>{
     // get users data from frontend
@@ -40,16 +41,21 @@ const registerUser = asyncHandler( async (req, res)=>{
         throw new ApiError(400, "All Fields are required")
     }
 
-    const existingUser = User.findOne({
-        $or: ({username},{email})
+    const existingUser = await User.findOne({
+        $or: [{username},{email}]
     })
     if (existingUser){
         throw new ApiError(409,"User with given username or email exists");
     }
 
-    const avatarLocalPath = req.files?.avatar[0]?.path; // names from routes
-    const coverImageLocalPath = req.files?.coverImage[0]?.path;
+    const avatarLocalPath = path.resolve(req.files?.avatar[0]?.path); // names from routes
+    // const coverImageLocalPath = path.resolve(req.files?.coverImage[0]?.path);
 
+    // it is recommended all files should be checked like this
+    let coverImageLocalPath;
+    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0){
+        coverImageLocalPath = req.files.coverImage[0].path;
+    }
     if (!avatarLocalPath){
         throw new ApiError (400, "Avatar file is required");
     }
@@ -58,6 +64,7 @@ const registerUser = asyncHandler( async (req, res)=>{
 
     const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
+    console.log("MUlter files:",req.files);
     if (!avatar){
         throw new ApiError (400, "Avatar file is required");
     }
