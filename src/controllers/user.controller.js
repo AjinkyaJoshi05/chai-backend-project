@@ -248,7 +248,7 @@ const changeCurreentPassword = asyncHandler(async (req,res)=>{
 const getCurrentUser = asyncHandler(async (req,res)=>{
     return res
     .status(200)
-    .json(200, req.user, "Current user fetched successfully");
+    .json(new ApiResponse (200, req.user, "Current user fetched successfully"));
 })
 
 const updateAccountDetails = asyncHandler(async (req,res)=>{
@@ -257,7 +257,7 @@ const updateAccountDetails = asyncHandler(async (req,res)=>{
         throw new ApiError(400,"all fields are required"); 
     }
 
-    const user = User.findByIdAndUpdate(req.user?._id,{
+    const user = await User.findByIdAndUpdate(req.user?._id,{
         $set: {
             fullname: fullname,
             email: email
@@ -274,6 +274,9 @@ const updateUserAvatar = asyncHandler(async (req,res)=>{
     if (!avatarLocalPath){
         throw new ApiError (400, "Avatar file is missing");
     }
+
+
+    // todo delete previous avatar image
 
     const avatar = await uploadOnCloudinary (avatarLocalPath);
     if (!avatar.url){
@@ -318,4 +321,88 @@ const updateCoverImage = asyncHandler(async(req,res)=>{
     .json( new ApiResponse(200,user,"Cover Image updated successfully"))
 });
 
-export {registerUser, loginUser,logoutUser,refreshAceessToken,changeCurreentPassword,getCurrentUser,updateAccountDetails,updateUserAvatar,updateCoverImage}
+const getUserChannelProfile = asyncHandler(async(req,res)=>{
+    const {username} = req.params;
+    if (!username?.trim()){
+        throw new ApiError(400,"Username is missing");
+    }
+
+    const channel = await User.aggregate([
+        {
+            $match:{
+                username : username?.toLowerCase() 
+            }
+        }, // at the end of this stage (first) we will have all documents with the given username (the current user)
+        {
+            $lookup:{
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"channel",
+                as:"subscribers"
+            }
+        }, // at the end of this stage we have an array which contains all the documents that have subscribed to this user
+        // checks in the subscriptions model for current user as a channel. its count gives no. of subscribers
+        {
+            $lookup:{
+                from:"subscriptions",
+                localField:"_id",
+                foreignField:"subscriber",
+                as:"subscribedTo"
+            }
+        }, // at the end of this stage we have all channels to which this user has subscribed to
+        // checks in the subscriptions model for current user as a subscriber. Its count gives no.of subscribed to
+        {
+            $addFields:{
+                subscriberCount:{
+                    $size: "$subscribers"
+                },
+                channelsSubscribedToCount:{
+                    $size: "$subscribedTo"
+                },
+                isSubscribed:{
+                    $cond:{
+                        if:{$in:[req.user?._id,"$subscribers.subscriber"]}, // this line heps chek wether the user is subscribed to the channel
+                        then:true,
+                        else:false
+                    }
+                }
+            }
+        },
+        {
+            $project:{
+                fullname:1,
+                username:1,
+                subscriberCount:1,
+                channelsSubscribedToCount:1,
+                isSubscribed:1,
+                avatar:1,
+                coverImage:1,
+                email:1
+            }
+        }// the project passes all these fields to of the required dataframe.
+    ])
+    console.log(channel);
+
+    if (!channel?.length){
+        throw new ApiError (404,"Channel does not exist");
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200,channel[0],"User channel faced successfully")
+    )
+})
+
+export {
+    registerUser, 
+    loginUser,
+    logoutUser,
+    refreshAceessToken,
+    changeCurreentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateCoverImage,
+    getUserChannelProfile
+}
