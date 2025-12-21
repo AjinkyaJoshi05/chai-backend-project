@@ -1,9 +1,10 @@
 import mongoose, {isValidObjectId} from "mongoose"
-import {Playlist} from "../models/playlist.model.js"
+import {Playlist} from "../models/playlist.models.js"
 import {ApiError} from "../utils/ApipError.js"
 import {ApiResponse} from "../utils/ApiResponse.js"
 import {asyncHandler} from "../utils/asyncHandler.js"
 import {Video} from "../models/video.model.js"
+import { populate } from "dotenv"
 
 const createPlaylist = asyncHandler(async (req, res) => {
     const {name, description} = req.body
@@ -369,12 +370,99 @@ const removeVideoFromPlaylist = asyncHandler(async (req, res) => {
 const deletePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
     // TODO: delete playlist
-})
+    if (!playlistId?.trim()){
+        throw new ApiError(400,"Playlist ID is required");
+    }
+    if(!mongoose.isValidObjectId(playlistId)){
+        throw new ApiError(400,"Playlist ID is invalid");
+    }
+
+    const playlist = await Playlist.findById(playlistId);
+    if (!playlist){
+        throw new ApiError(404, "Playlist not found");
+    }
+
+    if (playlist.owner.toString() !== req.user._id.toString()){
+        throw new ApiError(403, "You are not a authenticated to delete this playlist");
+    }
+
+    const deletedPlaylist = await Playlist.findByIdAndDelete(playlistId);
+    if (!deletedPlaylist){
+        throw new ApiError(500, "Failed to delete playlist");
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            {},
+            "Playlist deleted successfully"
+        )
+    );
+});
 
 const updatePlaylist = asyncHandler(async (req, res) => {
     const {playlistId} = req.params
     const {name, description} = req.body
     //TODO: update playlist
+    if (!playlistId?.trim()){
+        throw new ApiError(400,"Playlist ID is required");
+    }
+    if (!isValidObjectId(playlistId)){
+        throw new ApiError(400,"Playlist ID is not valid");
+    }
+
+    if (!(name?.trim() || description?.trim())){
+        throw new ApiError(400,"Name or description required");
+    }
+
+    const playlist = await Playlist.findById(playlistId);
+    if (!playlist){
+        throw new ApiError(404,"Playlist not found");
+    }
+    
+    if (playlist.owner.toString() !== req.user._id.toString()){
+        throw new ApiError(403,"You are not authenticated to update this playlist");
+    }
+
+    const updateFields = {};
+    if (name && name.trim()){
+        updateFields.name = name.trim()
+    }
+    if (description && description.trim()){
+        updateFields.description = description.trim()
+    }
+
+    const updatedPlaylist = await Playlist.findByIdAndUpdate(
+        playlistId,
+        {
+            $set : updateFields
+        }
+    )
+    .populate("owner" , "username fullname avatar")
+    .populate({
+        path: "vidoes",
+        select : "title thumbnail duration views",
+        populate:{
+            path : "owner",
+            selsct: "username fullname avatar"
+        }
+    });
+
+    if (!updatedPlaylist){
+        throw new ApiError(500,"Unable to update the playlist")
+    }
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            updatedPlaylist,
+            "Playlist updated Successfully"
+        )
+    );
 })
 
 export {
