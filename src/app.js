@@ -27,6 +27,7 @@ import commentRouter from "./routes/comment.router.js";
 import tweetRouter from "./routes/tweet.router.js";
 import likeRouter from "./routes/like.router.js";
 import playlistRouter from "./routes/playlist.router.js";
+import subscriptionRouter from "./routes/subscription.router.js";
 
 
 
@@ -38,6 +39,7 @@ app.use("/api/v1/comment",commentRouter);
 app.use("/api/v1/tweet",tweetRouter);
 app.use("/ap1/v1/like",likeRouter);
 app.use("/api/v1/playlist",playlistRouter);
+app.use("/api/v1/subscription",subscriptionRouter);
  
 // http://localhost:8000/api/v1/users/register
 
